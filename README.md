@@ -33,9 +33,7 @@ Add the package to your `pubspec.yaml` (using your local path or git URL):
 
 ```yaml
 dependencies:
-  resource_state_builder:
-    git:
-      url: https://github.com/Moo-Meshrif/resource_State_builder.git
+  resource_state_builder: ^0.0.2
 ```
 
 ---

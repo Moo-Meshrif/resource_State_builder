@@ -1,5 +1,7 @@
 /// Visual layer for [Resource] handling.
 /// Provides components to build UI specifically for single and paginated collections.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
