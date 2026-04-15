@@ -1,0 +1,20 @@
+name: resource_state_builder
+description: "A generic implementation of resource states and UI builders for paginated and standard resources."
+version: 0.0.1
+homepage: "https://github.com/Moo-Meshrif/resource_State_builder"
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  freezed_annotation: ^2.4.4
+  skeletonizer: ^2.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.14
+  freezed: ^2.5.7
