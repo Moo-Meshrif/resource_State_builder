@@ -32,7 +32,7 @@ Add the package to your `pubspec.yaml` (using your local path or git URL):
 
 ```yaml
 dependencies:
-  resource_state_builder: ^0.0.2
+  resource_state_builder: ^0.0.4
 ```
 
 ---
