@@ -18,12 +18,11 @@ Modern mobile apps shouldn't just show a spinner. This system encourages:
 2. [Core Components](#-core-components)
 3. [Required User Models](#-required-user-models)
 4. [State Definitions](#-state-definitions)
-5. [ResourceConfig (Global Configuration)](#-resourceconfig-global-configuration)
-6. [ResourceBuilder (Single Objects)](#-resourcebuilder-single-objects)
-7. [PaginatedResourceBuilder (Collections)](#-paginatedresourcebuilder-collections)
-8. [Logic Layer Integration](#-logic-layer-integration)
-9. [Advanced Patterns](#-advanced-patterns)
-10. [Example](#-example)
+5. [Extensions & Helpers (Logic & Advanced Patterns)](#-extensions--helpers-logic--advanced-patterns)
+6. [ResourceConfig (Global Configuration)](#-resourceconfig-global-configuration)
+7. [ResourceBuilder (Single Objects)](#-resourcebuilder-single-objects)
+8. [PaginatedResourceBuilder (Collections)](#-paginatedresourcebuilder-collections)
+9. [Example](#-example)
 
 ---
 
@@ -96,6 +95,87 @@ The `Resource<T, E>` model defines the exact lifecycle of your data.
 | `.gettingMore(T? data)`| Pagination | Keeping existing list; adding footer loader. |
 | `.loaded(T data)` | Success | Renders final data via the `builder`. |
 | `.error(E error)` | Failed | Renders local `error` builder or global `errorBuilder`. |
+
+---
+
+## ✨ Extensions & Helpers (Logic & Advanced Patterns)
+
+The package provides several helper extensions to make your logic and UI code more expressive and manageable.
+
+### 1. ResourceExtension
+Available on any `Resource<T, E>`. These helpers allow you to inspect and modify states without verbose pattern matching.
+
+#### 🔍 State Checks (Getters)
+- `isInitial`: True if no action has been taken yet.
+- `isLoading`: True during the very first data fetch.
+- `isPopUpLoading`: True when a global/blocking loader is active.
+- `isRedirectLoading`: True when recovering from an error or manually triggering a full reload.
+- `isUpdating`: True during background refreshes (retains existing data).
+- `isGettingMore`: True during pagination/scrolling for more items.
+- `isLoaded`: True when data is successfully fetched and ready.
+- `isError`: True when the operation failed with a domain error.
+
+#### 📦 Data Extraction (Getters)
+- `data`: Safely extracts `T?`. It returns the current data if the state is `loaded`, `updating`, or `gettingMore`, and `null` otherwise.
+- `error`: Safely extracts the domain error `E?` from the `error` state.
+- `successMessage`: Extracts an optional message (e.g., "Profile updated") from the `loaded` state.
+
+#### ⚙️ Logic Integration (`toLoading` & `copyWith`)
+- `toLoading({bool refresh, bool redirect})`: Converts the state into a loading variant.
+- `copyWith({T? data, E? error})`: Safely updates data or error while maintaining state type.
+
+**Example Usage:**
+```dart
+Resource<User, Failure> user = const Resource.initial();
+
+// Transition to loading while keeping old data if exists
+user = user.toLoading(refresh: true); 
+
+// Recovery: use redirect when retrying from an error (required if data is null)
+user = user.toLoading(redirect: true); 
+
+// Successful update
+user = Resource.loaded(userFromServer);
+
+// Safe data update within valid states
+user = user.copyWith(data: updatedUser);
+```
+
+### 2. ResourcePaginatedX
+Specialized helpers for resources containing list-based data that implements `PaginatedData`.
+
+- `removeWhere(test, rebuild)`: Enables **Optimistic UI Updates**. It filters the current list items based on a predicate and packages the result into your custom model.
+
+**Example Usage:**
+```dart
+// Remove an item locally without a full API refresh
+resource.removeWhere(
+  (item) => item.id == deletedId,
+  (newItems, current) => current.copyWith(items: newItems),
+);
+```
+
+### 3. ResourceAggregator
+Available on `Iterable<Resource>`. Useful for composite screens that depend on multiple concurrent API calls.
+
+- `isAnyLoading`: Returns true if ANY tracked resource is in a `redirectLoading` state.
+- `hasError`: Returns true if ANY resource has failed.
+- `toAggregate<T, E>(T value)`: Combines the status of multiple resources into one.
+
+**Example Usage:**
+```dart
+// Combine multiple resources into one aggregate state
+final resources = [state.profile, state.orders];
+final combinedStatus = resources.toAggregate(myData); 
+
+ResourceBuilder(
+  resource: combinedStatus,
+  builder: (context, _) => MainDashboard(
+    user: state.profile.data!,
+    orders: state.orders.data!,
+  ),
+)
+```
 
 ---
 
@@ -250,55 +330,6 @@ CustomScrollView(
       itemBuilder: (context, index, item) => ItemTile(item: item),
     ),
   ],
-)
-```
-
----
-
-## 🧠 Logic Layer Integration
-
-### Converting States (`toLoading`)
-```dart
-Resource<User, Failure> user = const Resource.initial();
-
-// Transition to loading while keeping old data if exists
-user = user.toLoading(refresh: true); 
-
-// Recovery: use redirect when retrying from an error (required if data is null)
-user = user.toLoading(redirect: true); 
-
-// Successful update
-user = Resource.loaded(userFromServer);
-```
-
----
-
-## 🧩 Advanced Patterns
-
-### Paginated List Manipulation (`removeWhere`)
-Perform optimistic UI updates by removing items locally without a full refresh:
-
-```dart
-resource.removeWhere(
-  (item) => item.id == deletedId,
-  (newItems, current) => current.copyWith(items: newItems),
-);
-```
-
-### Handling Multiple API Calls (`toAggregate`)
-If a screen depends on multiple resources, use `toAggregate` to track their combined state.
-
-```dart
-// Combine multiple resources into one
-final resources = [state.profile, state.orders];
-final combinedStatus = resources.toAggregate(myData); 
-
-ResourceBuilder(
-  resource: combinedStatus,
-  builder: (context, _) => MainDashboard(
-    user: state.profile.data!,
-    orders: state.orders.data!,
-  ),
 )
 ```
 

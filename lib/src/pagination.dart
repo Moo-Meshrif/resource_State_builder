@@ -18,6 +18,6 @@ extension ResourcePaginatedX<T, E, P extends PaginatedData<T>>
     if (currentData == null) return this;
 
     final updated = currentData.items.where((e) => !test(e)).toList();
-    return copyWithData(rebuild(updated, currentData));
+    return copyWith(data: rebuild(updated, currentData));
   }
 }

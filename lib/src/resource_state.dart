@@ -92,16 +92,13 @@ extension ResourceExtension<T, E> on Resource<T, E> {
   ///
   /// - Only updates data where it is valid
   /// - Prevents invalid state transitions
-  Resource<T, E> copyWithData(T? value) => maybeMap(
-    loaded: (s) => s.copyWith(data: value ?? s.data),
-    updating: (s) => s.copyWith(data: value ?? s.data),
-    gettingMore: (s) => s.copyWith(data: value ?? s.data),
+  Resource<T, E> copyWith({T? data, E? error}) => maybeMap(
+    loaded: (s) => s.copyWith(data: data ?? s.data),
+    updating: (s) => s.copyWith(data: data ?? s.data),
+    gettingMore: (s) => s.copyWith(data: data ?? s.data),
+    error: (s) => error != null ? Resource<T, E>.error(error) : s,
     orElse: () => this,
   );
-
-  /// Safely updates error without breaking state integrity.
-  Resource<T, E> copyWithError(E value) =>
-      maybeMap(error: (_) => Resource<T, E>.error(value), orElse: () => this);
 }
 
 /// Aggregates multiple [Resource] instances into a single UI state.
