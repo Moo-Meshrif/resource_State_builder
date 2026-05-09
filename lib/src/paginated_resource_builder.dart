@@ -9,10 +9,12 @@ import 'resource_state.dart';
 
 // =============================================================================
 
-/// A specialized widget that builds a paginated collection with its own [CustomScrollView].
+/// Use the [PaginatedResourceBuilder] with `hasInternalScroll: false` to get
+/// a pure sliver that can be embedded directly inside an existing
+/// [CustomScrollView].
 ///
-/// It handles loading, error, empty, data states, infinite scrolling, and pull-to-refresh.
-/// It works as a standalone scrollable widget and should NOT be wrapped in another [CustomScrollView].
+/// Pass [scrollDirection] for horizontal lists. Pass [gridDelegate] to switch
+/// from [SliverList] to [SliverGrid].
 class PaginatedResourceBuilder<T, P extends PaginatedData<T>, E>
     extends StatelessWidget {
   /// The paginated resource to monitor (infinite scrolling).
@@ -84,6 +86,13 @@ class PaginatedResourceBuilder<T, P extends PaginatedData<T>, E>
   /// Whether the internal scroll view should be wrapped in a [CustomScrollView].
   final bool hasInternalScroll;
 
+  /// The scroll direction of the list or grid. Defaults to [Axis.vertical].
+  final Axis scrollDirection;
+
+  /// When set, renders a [SliverGrid] instead of [SliverList].
+  final SliverGridDelegate? gridDelegate;
+
+  /// Standard constructor — renders its own [CustomScrollView].
   PaginatedResourceBuilder({
     super.key,
     required this.resource,
@@ -107,13 +116,15 @@ class PaginatedResourceBuilder<T, P extends PaginatedData<T>, E>
     this.reverse = false,
     this.shrinkWrap = false,
     this.hasInternalScroll = true,
+    this.scrollDirection = Axis.vertical,
+    this.gridDelegate,
   }) {
     if (itemBuilder == null && customBuilder == null) {
       throw Exception('itemBuilder or customBuilder must be provided');
     }
   }
 
-  /// Gets the scroll physics for the internal [CustomScrollView].
+
   ScrollPhysics? get _scrollPhysics {
     if (physics != null) return physics;
     if (onRefresh != null) return const AlwaysScrollableScrollPhysics();
@@ -130,6 +141,7 @@ class PaginatedResourceBuilder<T, P extends PaginatedData<T>, E>
         physics: _scrollPhysics,
         reverse: reverse,
         shrinkWrap: shrinkWrap,
+        scrollDirection: scrollDirection,
         slivers: [content],
       );
     }
@@ -168,16 +180,30 @@ class PaginatedResourceBuilder<T, P extends PaginatedData<T>, E>
             return customBuilder!(context, items);
           }
 
+          if (gridDelegate != null) {
+            return SliverGrid(
+              gridDelegate: gridDelegate!,
+              delegate: SliverChildBuilderDelegate(
+                (c, i) => itemBuilder!(c, i, items[i]),
+                childCount: items.length,
+              ),
+            );
+          }
+
           return SliverList.separated(
             itemCount: items.length,
             itemBuilder: (c, i) => itemBuilder!(c, i, items[i]),
-            separatorBuilder: (c, i) => SizedBox(height: spacing),
+            separatorBuilder: (c, i) => scrollDirection == Axis.horizontal
+                ? SizedBox(width: spacing)
+                : SizedBox(height: spacing),
           );
         },
       ),
       if (resource.data != null && onLoadMore != null)
         SliverPadding(
-          padding: EdgeInsets.symmetric(vertical: spacing),
+          padding: scrollDirection == Axis.horizontal
+              ? EdgeInsets.symmetric(horizontal: spacing)
+              : EdgeInsets.symmetric(vertical: spacing),
           sliver: SliverToBoxAdapter(child: _buildPaginationIndicator(context)),
         ),
     ],

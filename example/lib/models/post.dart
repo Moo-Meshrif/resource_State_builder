@@ -4,20 +4,27 @@ class Post {
   final int id;
   final String title;
   final String body;
+  final bool isRead;
 
   Post({
     required this.id,
     required this.title,
     required this.body,
+    this.isRead = false,
   });
 
-  factory Post.fromJson(Map<String, dynamic> json) {
-    return Post(
-      id: json['id'] as int,
-      title: json['title'] as String,
-      body: json['body'] as String,
-    );
-  }
+  factory Post.fromJson(Map<String, dynamic> json) => Post(
+        id: json['id'] as int,
+        title: json['title'] as String,
+        body: json['body'] as String,
+      );
+
+  Post copyWith({String? title, String? body, bool? isRead}) => Post(
+        id: id,
+        title: title ?? this.title,
+        body: body ?? this.body,
+        isRead: isRead ?? this.isRead,
+      );
 
   static List<Post> get mock => List.generate(
         10,

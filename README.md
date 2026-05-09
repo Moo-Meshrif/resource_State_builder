@@ -22,7 +22,8 @@ Modern mobile apps shouldn't just show a spinner. This system encourages:
 6. [ResourceConfig (Global Configuration)](#-resourceconfig-global-configuration)
 7. [ResourceBuilder (Single Objects)](#-resourcebuilder-single-objects)
 8. [PaginatedResourceBuilder (Collections)](#-paginatedresourcebuilder-collections)
-9. [Example](#-example)
+9. [MultiResourceBuilder (Composite Screens)](#-multiresourcebuilder-composite-screens)
+10. [Example](#-example)
 
 ---
 
@@ -32,7 +33,7 @@ Add the package to your `pubspec.yaml` (using your local path or git URL):
 
 ```yaml
 dependencies:
-  resource_state_builder: ^0.0.4
+  resource_state_builder: ^0.0.5
 ```
 
 ---
@@ -122,6 +123,8 @@ Available on any `Resource<T, E>`. These helpers allow you to inspect and modify
 
 #### ⚙️ Logic Integration (`toLoading` & `copyWith`)
 - `toLoading({bool refresh, bool redirect})`: Converts the state into a loading variant.
+- `toGettingMore()`: Transitions to the `gettingMore` state, carrying current data.
+- `toPopUpLoading()`: Transitions to the `popUpLoading` state.
 - `copyWith({T? data, E? error})`: Safely updates data or error while maintaining state type.
 
 **Example Usage:**
@@ -144,12 +147,30 @@ user = user.copyWith(data: updatedUser);
 ### 2. ResourcePaginatedX
 Specialized helpers for resources containing list-based data that implements `PaginatedData`.
 
-- `removeWhere(test, rebuild)`: Enables **Optimistic UI Updates**. It filters the current list items based on a predicate and packages the result into your custom model.
+- `appendItems(newPage, rebuild)`: Merges new page items onto the end of the current list.
+- `prependItems(newItems, rebuild)`: Inserts items at the beginning of the current list.
+- `updateWhere(test, update, rebuild)`: Applies an update to every item that satisfies a predicate.
+- `replaceWhere(test, newItem, rebuild)`: Replaces every item that satisfies a predicate with a new item.
+- `insertAt(index, item, rebuild)`: Inserts an item at a specific index.
+- `removeWhere(test, rebuild)`: Enables **Optimistic UI Updates**. It filters the current list items based on a predicate.
 
 **Example Usage:**
 ```dart
-// Remove an item locally without a full API refresh
-resource.removeWhere(
+// Append new items from a paginated response
+resource = resource.appendItems(
+  newPage,
+  (merged, page) => page.copyWith(items: merged),
+);
+
+// Update a specific item locally
+resource = resource.updateWhere(
+  (item) => item.id == targetId,
+  (item) => item.copyWith(name: 'Updated'),
+  (items, current) => current.copyWith(items: items),
+);
+
+// Remove an item locally
+resource = resource.removeWhere(
   (item) => item.id == deletedId,
   (newItems, current) => current.copyWith(items: newItems),
 );
@@ -158,9 +179,9 @@ resource.removeWhere(
 ### 3. ResourceAggregator
 Available on `Iterable<Resource>`. Useful for composite screens that depend on multiple concurrent API calls.
 
-- `isAnyLoading`: Returns true if ANY tracked resource is in a `redirectLoading` state.
-- `hasError`: Returns true if ANY resource has failed.
-- `toAggregate<T, E>(T value)`: Combines the status of multiple resources into one.
+- `isAllLoading`: Returns true if ALL tracked resources are in a `redirectLoading` state.
+- `hasAllError`: Returns true if ALL resources have failed.
+- `toAggregate<T, E>(T value)`: Combines the status of multiple resources into one using **strict (All)** logic. It only returns error/loading if ALL resources are in that state.
 
 **Example Usage:**
 ```dart
@@ -182,6 +203,8 @@ ResourceBuilder(
 ## ⚙️ ResourceConfig (Global Configuration)
 
 Instead of passing error and loading widgets to every builder, define them once at the root of your app using your custom error model.
+
+**Inheritance & Nesting**: `ResourceConfig` widgets can be nested. A child config only needs to supply the builders it wants to override; any builder left `null` is **automatically inherited** from the nearest ancestor.
 
 ```dart
 ResourceConfig<Failure>(
@@ -277,6 +300,8 @@ The specialized component for building paginated feeds with zero boilerplate.
 | `physics` | `ScrollPhysics?` | Custom scroll physics for the internal scroll view. |
 | `reverse` | `bool` | Whether the scroll view is reversed. |
 | `shrinkWrap` | `bool` | Whether the internal scroll view should shrink wrap. |
+| `scrollDirection` | `Axis` | Scroll direction: `Axis.vertical` (default) or `Axis.horizontal`. |
+| `gridDelegate` | `SliverGridDelegate?` | When set, renders a **Grid** instead of a List. |
 | `hasInternalScroll`| `bool` | `true` (default) for standalone; `false` for sliver mode. |
 
 > [!TIP]
@@ -303,13 +328,28 @@ PaginatedResourceBuilder<Item, ProductPage, Failure>(
 )
 ```
 
-### 3. Custom Layout (e.g., Grid)
-Use `customBuilder` when you need something other than a standard list.
+### 3. Custom Grid Layout
+For simple grids, use the `gridDelegate` property. For complex custom layouts, use `customBuilder`.
+
+**Using `gridDelegate`:**
+```dart
+PaginatedResourceBuilder<Item, ProductPage, Failure>(
+  resource: state.products,
+  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: 2,
+    mainAxisSpacing: 10,
+    crossAxisSpacing: 10,
+  ),
+  itemBuilder: (context, index, item) => ItemCard(item: item),
+)
+```
+
+**Using `customBuilder`:**
 ```dart
 PaginatedResourceBuilder<Item, ProductPage, Failure>(
   resource: state.products,
   customBuilder: (context, items) => SliverGrid(
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
     delegate: SliverChildBuilderDelegate(
       (context, index) => ItemCard(item: items[index]),
       childCount: items.length,
@@ -330,6 +370,39 @@ CustomScrollView(
       itemBuilder: (context, index, item) => ItemTile(item: item),
     ),
   ],
+)
+```
+
+---
+
+## 🏗 MultiResourceBuilder (Composite Pages)
+
+Used for complex pages with multiple data sources. It unifies global states (initial loading/error) while delegating individual background refreshes and skeleton logic to internal `ResourceBuilder`s within a single `CustomScrollView`.
+
+### Parameters
+- `standards`: List of `ResourceDef` for standard API calls.
+- `paginated`: Optional `PaginatedResourceDef` for a paginated list.
+- `useSkeleton`: (Default: `true`) If true, shows skeletons for individual resources during initial load else if false global loading shown.
+- `globalError`: (Required) The error object to pass to the error builder if all resources fail.
+
+### Usage
+```dart
+MultiResourceBuilder<Failure>(
+  globalError: Failure('Something went wrong'),
+  onRefresh: () => cubit.refreshAll(),
+  standards: [
+    ResourceDef(
+      resource: state.profile,
+      initialData: User.mock(),
+      builder: (context, user) => ProfileSliver(user),
+    ),
+  ],
+  paginated: PaginatedResourceDef(
+    resource: state.posts,
+    initialData: Post.mocks(),
+    onLoadMore: () => cubit.loadMore(),
+    itemBuilder: (context, index, post) => PostTile(post),
+  ),
 )
 ```
 

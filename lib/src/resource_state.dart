@@ -88,6 +88,12 @@ extension ResourceExtension<T, E> on Resource<T, E> {
     return Resource<T, E>.loading();
   }
 
+  /// Transitions to [ResourceGettingMore], carrying current data.
+  Resource<T, E> toGettingMore() => Resource<T, E>.gettingMore(data);
+
+  /// Transitions to [ResourcePopUpLoading].
+  Resource<T, E> toPopUpLoading() => Resource<T, E>.popUpLoading();
+
   /// Safely updates data or error without breaking state integrity.
   ///
   /// - Only updates data where it is valid
@@ -106,26 +112,33 @@ extension ResourceExtension<T, E> on Resource<T, E> {
 /// Useful for screens that depend on multiple API calls
 /// (e.g., profile + settings + permissions).
 extension ResourceAggregator on Iterable<Resource<dynamic, dynamic>> {
-  /// Returns true if ANY resource is showing a global loader.
-  bool get isAnyLoading => any((s) => s.isRedirectLoading);
+  /// Returns true if ALL resources are showing a global loader.
+  bool get isAllRedirectLoading => every((s) => s.isRedirectLoading);
 
-  /// Returns true if ANY resource is in an error state.
-  bool get hasError => any((s) => s.isError);
+  /// Returns true if ALL resources are showing a global loader.
+  bool get isAllLoading => every((s) => s.isLoading || s.isPopUpLoading);
 
-  /// Returns the first encountered error (if any).
-  dynamic get error => fold<dynamic>(null, (prev, s) => prev ?? s.error);
+  /// Returns true if ALL resources are in an error state.
+  bool get hasAllError => every((s) => s.isError);
+
+  /// Returns true if all resources are empty (data is null, not loading, and no error).
+  bool get isAllEmpty =>
+      every((s) => s.data == null && !s.isLoading && !s.isError);
 
   /// Combines all resources into a single [Resource<T, E>].
   ///
-  /// Priority:
-  /// 1. Any error        -> [Resource.error]
-  /// 2. Any global load  -> [Resource.redirectLoading]
-  /// 3. Otherwise        -> [Resource.loaded]
-  Resource<T, E> toAggregate<T, E>(T value) {
-    if (hasError) {
-      return Resource<T, E>.error(error as E);
-    } else if (isAnyLoading) {
+  /// Strict resolution (All):
+  /// 1. All loading (Initial/PopUp) -> [Resource.loading]
+  /// 2. All redirect loads          -> [Resource.redirectLoading]
+  /// 3. All errors                  -> [Resource.error]
+  /// 4. Otherwise                   -> [Resource.loaded]
+  Resource<T, E> toAggregate<T, E>(T value, E globalError) {
+    if (isAllLoading) {
+      return Resource<T, E>.loading();
+    } else if (isAllRedirectLoading) {
       return Resource<T, E>.redirectLoading();
+    } else if (hasAllError) {
+      return Resource<T, E>.error(globalError);
     }
     return Resource<T, E>.loaded(value);
   }

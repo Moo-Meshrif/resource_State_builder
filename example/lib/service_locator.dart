@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:dio/dio.dart';
 import 'repositories/post_repository.dart';
+import 'repositories/user_repository.dart';
 import 'cubits/post_cubit.dart';
 
 final locator = GetIt.instance;
@@ -13,9 +14,10 @@ void setupLocator() {
   locator.registerLazySingleton<PostRepository>(
     () => PostRepository(locator<Dio>()),
   );
+  locator.registerLazySingleton<UserRepository>(() => UserRepository());
 
   // Cubits (Factories usually, as they have state)
   locator.registerFactory<PostCubit>(
-    () => PostCubit(locator<PostRepository>()),
+    () => PostCubit(locator<PostRepository>(), locator<UserRepository>()),
   );
 }

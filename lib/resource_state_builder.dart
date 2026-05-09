@@ -5,3 +5,4 @@ export 'src/resource_config.dart';
 export 'src/resource_builder.dart';
 export 'src/paginated_resource_builder.dart';
 export 'src/pagination.dart';
+export 'src/multi_resource_builder.dart';

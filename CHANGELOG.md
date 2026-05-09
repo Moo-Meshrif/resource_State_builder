@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-------------------------------------------------------------------------
+## [0.0.5]
+
+### Added
+- **MultiResourceBuilder**: Implemented composite architecture with `ResourceDef` and `PaginatedResourceDef` for robust multi-resource screens.
+- **Resource State**: Added new extension methods `toGettingMore()`/`toPopUpLoading()` for easier state transitions.
+- **Pagination Helpers**: New data manipulation methods for paginated resources: `appendItems`, `prependItems`, `updateWhere`, `replaceWhere`, and `insertAt`.
+- **Resource Config**: Implemented inheritance/merging for nested `ResourceConfig` widgets, allowing partial overrides.
+- **Paginated Resource Builder**: Added support for horizontal scroll direction and grid layouts via `scrollDirection` and `gridDelegate`.
+
+### Fixed
+- **ResourceAggregator**: Improved logic to use strict (All) resolution for `toAggregate`.
 
 ## [0.0.4]
 

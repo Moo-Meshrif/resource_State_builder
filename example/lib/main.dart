@@ -53,10 +53,11 @@ class PostApp extends StatelessWidget {
             ],
           ),
         ),
+        defaultGlobalError: 'Unable to load content at the moment.',
         child: MaterialApp(
           title: 'Resource State Builder Example',
           theme: ThemeData(
-            primarySwatch: Colors.blue,
+            primarySwatch: Colors.deepPurple,
             useMaterial3: true,
           ),
           home: const PostPage(),

@@ -1,0 +1,1 @@
+enum PostAction { delete, markRead }
