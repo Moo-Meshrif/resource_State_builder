@@ -14,7 +14,9 @@ void setupLocator() {
   locator.registerLazySingleton<PostRepository>(
     () => PostRepository(locator<Dio>()),
   );
-  locator.registerLazySingleton<UserRepository>(() => UserRepository());
+  locator.registerLazySingleton<UserRepository>(
+    () => UserRepository(locator<Dio>()),
+  );
 
   // Cubits (Factories usually, as they have state)
   locator.registerFactory<PostCubit>(

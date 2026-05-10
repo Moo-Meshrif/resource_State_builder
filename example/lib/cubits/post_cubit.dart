@@ -28,9 +28,14 @@ class PostCubit extends Cubit<PostState> {
   Future<void> refreshAll([bool redirect = false]) async {
     await Future.wait([
       refreshPosts(redirect),
-      fetchProfile(refresh: !redirect, redirect: redirect),
+      refreshProfile(redirect),
     ]);
   }
+
+  Future<void> refreshProfile([bool redirect = false]) => fetchProfile(
+        refresh: true,
+        redirect: redirect,
+      );
 
   Future<void> fetchProfile({
     bool refresh = false,

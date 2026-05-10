@@ -1,6 +1,6 @@
 name: resource_state_builder
 description: "A generic implementation of resource states and UI builders for paginated and standard resources."
-version: 0.0.6
+version: 0.0.7
 repository: https://github.com/Moo-Meshrif/resource_State_builder
 homepage: "https://github.com/Moo-Meshrif/resource_State_builder"
 issue_tracker: https://github.com/Moo-Meshrif/resource_State_builder/issues

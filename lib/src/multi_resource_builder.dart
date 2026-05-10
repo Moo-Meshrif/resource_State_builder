@@ -4,7 +4,6 @@ import '../resource_state_builder.dart';
 
 /// Base logic for multi-resource builders to avoid code duplication.
 abstract class _MultiResourceBase<E> extends StatelessWidget {
-  final List<Resource<dynamic, E>> aggregateResources;
   final Widget? loading;
   final Widget Function(BuildContext context, E error)? error;
   final Widget? empty;
@@ -16,7 +15,6 @@ abstract class _MultiResourceBase<E> extends StatelessWidget {
 
   const _MultiResourceBase({
     super.key,
-    required this.aggregateResources,
     this.globalError,
     this.loading,
     this.error,
@@ -25,7 +23,11 @@ abstract class _MultiResourceBase<E> extends StatelessWidget {
     this.onRefresh,
   });
 
-  Widget buildInternal(BuildContext context, List<Widget> slivers) {
+  Widget buildInternal(
+    BuildContext context,
+    List<Resource<dynamic, E>> aggregateResources,
+    List<Widget> slivers,
+  ) {
     final config = ResourceConfig.maybeOf<E>(context);
     final errorToUse = globalError ?? config?.defaultGlobalError;
 
@@ -45,7 +47,8 @@ abstract class _MultiResourceBase<E> extends StatelessWidget {
       if (err != null) {
         return _scrollWrapper(
           context,
-          SliverToBoxAdapter(
+          SliverFillRemaining(
+            hasScrollBody: false,
             child:
                 error?.call(context, err as E) ??
                 config?.errorBuilder?.call(context, err as E, onRetry) ??
@@ -59,7 +62,8 @@ abstract class _MultiResourceBase<E> extends StatelessWidget {
     if (!isLoading && aggregateResources.isAllEmpty) {
       return _scrollWrapper(
         context,
-        SliverToBoxAdapter(
+        SliverFillRemaining(
+          hasScrollBody: false,
           child:
               empty ??
               config?.emptyBuilder?.call(context, onRetry) ??
@@ -68,7 +72,21 @@ abstract class _MultiResourceBase<E> extends StatelessWidget {
       );
     }
 
-    // 3. Success State (Slivers) or separate loading as skeleton if loading flag is true
+    // 3. Global Loading (Use loading widget for the whole screen)
+    if (aggregate.isRedirectLoading) {
+      return _scrollWrapper(
+        context,
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child:
+              loading ??
+              config?.loadingBuilder?.call(context) ??
+              const SizedBox.shrink(),
+        ),
+      );
+    }
+
+    // 4. Success State (Slivers) or separate loading as skeleton if loading flag is true
     Widget result = CustomScrollView(slivers: slivers);
 
     if (onRefresh != null &&
@@ -312,9 +330,24 @@ class MultiResourceBuilder<E> extends _MultiResourceBase<E> {
   /// initial loading state. If false, individual loading widgets are shown.
   final bool useSkeleton;
 
+  /// Optional selector builder that wraps the entire builder in a
+  /// state-management selector widget.
+  ///
+  /// This should supply the updated [aggregateResources] needed for global checks,
+  /// but you should ensure the selector ONLY rebuilds when the global layout state changes.
+  final Widget Function(
+    Widget Function(
+      BuildContext context,
+      List<Resource<dynamic, E>> aggregateResources,
+    )
+    childBuilder,
+  )?
+  resourcesSelector;
+
   MultiResourceBuilder({
     super.key,
     required this.standards,
+    this.resourcesSelector,
     super.globalError,
     this.paginated,
     super.loading,
@@ -323,18 +356,29 @@ class MultiResourceBuilder<E> extends _MultiResourceBase<E> {
     super.onRetry,
     super.onRefresh,
     this.useSkeleton = true,
-  }) : super(
-         aggregateResources: [
-           ...standards
-               .where((s) => s.resource != null)
-               .map((s) => s.resource!),
-           if (paginated?.resource != null) paginated!.resource!,
-         ],
+  }) : assert(
+         resourcesSelector != null ||
+             (!standards.any((s) => s.selectorBuilder != null) &&
+                 (paginated == null || paginated.selectorBuilder == null)),
+         'Must provide resourcesSelector when using selectorBuilder',
        );
 
   @override
-  Widget build(BuildContext context) => buildInternal(context, [
-    for (final s in standards) s.toSliver(useSkeleton),
-    if (paginated != null) paginated!.toSliver(useSkeleton),
-  ]);
+  Widget build(BuildContext context) {
+    final slivers = [
+      for (final s in standards) s.toSliver(useSkeleton),
+      if (paginated != null) paginated!.toSliver(useSkeleton),
+    ];
+
+    if (resourcesSelector != null) {
+      return resourcesSelector!(
+        (context, resources) => buildInternal(context, resources, slivers),
+      );
+    }
+
+    return buildInternal(context, [
+      ...standards.where((s) => s.resource != null).map((s) => s.resource!),
+      if (paginated?.resource != null) paginated!.resource!,
+    ], slivers);
+  }
 }

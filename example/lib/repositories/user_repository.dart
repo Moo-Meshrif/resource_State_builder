@@ -1,9 +1,23 @@
+import 'package:dio/dio.dart';
 import '../models/user.dart';
 
 class UserRepository {
+  final Dio _dio;
+
+  UserRepository(this._dio);
+
   Future<User> fetchProfile() async {
-    await Future.delayed(const Duration(seconds: 1));
-    // Simulate error occasionally if needed, but for now just success
-    return User.mock;
+    try {
+      final response = await _dio.get('https://dummyjson.com/users/1');
+      if (response.statusCode == 200) {
+        return User.fromJson(response.data);
+      } else {
+        throw Exception('Failed to load profile');
+      }
+    } on DioException catch (e) {
+      throw Exception('Network error: ${e.message}');
+    } catch (e) {
+      throw Exception('Unexpected error: $e');
+    }
   }
 }

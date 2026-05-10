@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.7]
+
+### Fixed
+- **Global Rebuild Optimization**: Added the `resourcesSelector` parameter to `MultiResourceBuilder` to replace `aggregateResources`. This allows dynamic tracking of the combined state of all resources without unnecessarily rebuilding the root layout, preserving global state behavior while utilizing high-performance individual slivers.
+
 ## [0.0.6]
 
 ### Added

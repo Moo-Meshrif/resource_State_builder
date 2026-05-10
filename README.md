@@ -383,10 +383,11 @@ Used for complex pages with multiple data sources. It unifies global states (ini
 ### Parameters
 - `standards`: List of `ResourceDef` for standard API calls.
 - `paginated`: Optional `PaginatedResourceDef` for a paginated list.
+- `resourcesSelector`: (Optional) A selector builder that provides the list of all tracked resources. Required if any item uses `selectorBuilder` without providing `resource`.
 - `useSkeleton`: (Default: `true`) If true, shows skeletons for individual resources during initial load else if false global loading shown.
 - `globalError`: (Required) The error object to pass to the error builder if all resources fail.
 
-**Optional Resource fields**: The `resource` parameter is optional if you provide a `selectorBuilder`. If you omit `resource`, that specific resource will NOT be included in `MultiResourceBuilder`'s global error/empty aggregation (but will still render its own sliver-level loading/error state if needed).
+**Optional Resource fields**: The `resource` parameter is optional if you provide a `selectorBuilder`. If you omit `resource`, that specific resource will NOT be included in `MultiResourceBuilder`'s global error/empty aggregation automatically, so you **must** provide a `resourcesSelector` to supply them dynamically.
 
 ### Usage Patterns
 
@@ -420,9 +421,9 @@ BlocBuilder<PostCubit, PostState>(
 ```
 
 #### Approach 2: Selective Rebuilds (Preferred for high performance)
-Wrap `MultiResourceBuilder` in a static `Builder`, omit the `resource` parameter, and use `selectorBuilder`.
+Wrap `MultiResourceBuilder` in a static `Builder`, omit the `resource` parameter, and use `selectorBuilder` for each item. To maintain **global state aggregation** (like full-page error or empty states), you provide the `resourcesSelector` parameter.
 
-**Why use this?** This is preferred for massive screens where widgets are independent and rendering performance is critical. Only the specific resource that changed will rebuild its sliver. The tradeoff is that you **lose global state aggregation** (no full-page error/empty states), but each sliver perfectly handles its own local loading/error states.
+**Why use this?** This is preferred for massive screens where widgets are independent and rendering performance is critical. Only the specific resource that changed will rebuild its sliver. At the same time, the `resourcesSelector` ensures that the global layout only rebuilds when necessary, preventing unnecessary widget tree reconstructions.
 
 ```dart
 Builder(
@@ -431,6 +432,10 @@ Builder(
     return MultiResourceBuilder<Failure>(
       globalError: Failure('Something went wrong'),
       onRefresh: () => cubit.refreshAll(),
+      resourcesSelector: (childBuilder) => BlocSelector<PostCubit, PostState, List<Resource<dynamic, Failure>>>(
+        selector: (state) => [state.profile, state.posts],
+        builder: childBuilder,
+      ),
       standards: [
         ResourceDef(
           // resource: is omitted! Relies purely on selectorBuilder

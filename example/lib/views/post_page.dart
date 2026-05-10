@@ -24,6 +24,11 @@ class PostPage extends StatelessWidget {
             builder: (context) {
               final cubit = context.read<PostCubit>();
               return MultiResourceBuilder<String>(
+                resourcesSelector: (childBuilder) => BlocSelector<PostCubit,
+                    PostState, List<Resource<dynamic, String>>>(
+                  selector: (state) => [state.userResource, state.postResource],
+                  builder: childBuilder,
+                ),
                 globalError: 'Failed to load page content',
                 onRefresh: () => cubit.refreshAll(),
                 onRetry: () => cubit.refreshAll(true),
@@ -35,6 +40,7 @@ class PostPage extends StatelessWidget {
                       builder: childBuilder,
                     ),
                     initialData: User.mock,
+                    onRetry: () => cubit.refreshProfile(true),
                     builder: (context, user) => SliverToBoxAdapter(
                       child: ProfileHeader(
                         user: user,

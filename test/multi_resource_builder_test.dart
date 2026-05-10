@@ -89,6 +89,7 @@ void main() {
               emptyBuilder: (ctx, retry) => const Text('Empty'),
               child: MultiResourceBuilder<String>(
                 globalError: 'global error',
+                resourcesSelector: (b) => Builder(builder: (ctx) => b(ctx, [])),
                 standards: [
                   ResourceDef<String, String>(
                     resource: stateNotifier.value.userResource,
@@ -216,6 +217,7 @@ void main() {
             emptyBuilder: (ctx, retry) => const Text('Empty'),
             child: MultiResourceBuilder<String>(
               globalError: 'global error',
+              resourcesSelector: (b) => Builder(builder: (ctx) => b(ctx, [])),
               standards: [
                 ResourceDef<String, String>(
                   resource: stateNotifier.value.userResource,
@@ -294,6 +296,7 @@ void main() {
               emptyBuilder: (ctx, retry) => const Text('Empty'),
               child: MultiResourceBuilder<String>(
                 globalError: 'global error',
+                resourcesSelector: (b) => Builder(builder: (ctx) => b(ctx, [])),
                 standards: [
                   ResourceDef<String, String>(
                     // resource is OMITTED
@@ -338,6 +341,7 @@ void main() {
             home: Scaffold(
               body: MultiResourceBuilder<String>(
                 globalError: 'GlobalErr',
+                resourcesSelector: (b) => Builder(builder: (ctx) => b(ctx, [])),
                 standards: [
                   ResourceDef<String, String>(
                     resource: const Resource.loaded('A'),
