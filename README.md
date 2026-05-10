@@ -22,18 +22,17 @@ Modern mobile apps shouldn't just show a spinner. This system encourages:
 6. [ResourceConfig (Global Configuration)](#-resourceconfig-global-configuration)
 7. [ResourceBuilder (Single Objects)](#-resourcebuilder-single-objects)
 8. [PaginatedResourceBuilder (Collections)](#-paginatedresourcebuilder-collections)
-9. [MultiResourceBuilder (Composite Screens)](#-multiresourcebuilder-composite-screens)
+9. [MultiResourceBuilder (Composite Pages)](#-multiresourcebuilder-composite-pages)
 10. [Example](#-example)
 
 ---
 
 ## 🚀 Installation
 
-Add the package to your `pubspec.yaml` (using your local path or git URL):
+Add `resource_state_builder` to your `dependencies`:
 
-```yaml
-dependencies:
-  resource_state_builder: ^0.0.5
+```bash
+flutter pub add resource_state_builder
 ```
 
 ---
@@ -379,30 +378,82 @@ CustomScrollView(
 
 Used for complex pages with multiple data sources. It unifies global states (initial loading/error) while delegating individual background refreshes and skeleton logic to internal `ResourceBuilder`s within a single `CustomScrollView`.
 
+**Selective Rebuilds (selectorBuilder)**: To prevent sibling resources from rebuilding when only one resource changes, provide the `selectorBuilder` parameter. You can wrap the resource's sliver in any state management selector (e.g., `BlocSelector`, Provider `Selector`, Riverpod `select`).
+
 ### Parameters
 - `standards`: List of `ResourceDef` for standard API calls.
 - `paginated`: Optional `PaginatedResourceDef` for a paginated list.
 - `useSkeleton`: (Default: `true`) If true, shows skeletons for individual resources during initial load else if false global loading shown.
 - `globalError`: (Required) The error object to pass to the error builder if all resources fail.
 
-### Usage
+**Optional Resource fields**: The `resource` parameter is optional if you provide a `selectorBuilder`. If you omit `resource`, that specific resource will NOT be included in `MultiResourceBuilder`'s global error/empty aggregation (but will still render its own sliver-level loading/error state if needed).
+
+### Usage Patterns
+
+There are two distinct ways to use `MultiResourceBuilder`, depending on your screen's needs.
+
+#### Approach 1: Global State Aggregation (Preferred for cohesive screens)
+Wrap `MultiResourceBuilder` in a state listener (like `BlocBuilder`) and provide the `resource` parameter to each definition. 
+
+**Why use this?** This is preferred when the page feels like a single unit. It allows `MultiResourceBuilder` to calculate the **global** aggregate state—showing a full-page loading skeleton or a full-page error if *all* resources fail. The tradeoff is that the entire `MultiResourceBuilder` rebuilds on state changes.
+
 ```dart
-MultiResourceBuilder<Failure>(
-  globalError: Failure('Something went wrong'),
-  onRefresh: () => cubit.refreshAll(),
-  standards: [
-    ResourceDef(
-      resource: state.profile,
-      initialData: User.mock(),
-      builder: (context, user) => ProfileSliver(user),
+BlocBuilder<PostCubit, PostState>(
+  builder: (context, state) => MultiResourceBuilder<Failure>(
+    globalError: Failure('Something went wrong'),
+    onRefresh: () => context.read<PostCubit>().refreshAll(),
+    standards: [
+      ResourceDef(
+        resource: state.profile, // Passed directly for global aggregation
+        initialData: User.mock(),
+        builder: (context, user) => ProfileSliver(user),
+      ),
+    ],
+    paginated: PaginatedResourceDef(
+      resource: state.posts, // Passed directly for global aggregation
+      initialData: Post.mocks(),
+      onLoadMore: () => context.read<PostCubit>().loadMore(),
+      itemBuilder: (context, index, post) => PostTile(post),
     ),
-  ],
-  paginated: PaginatedResourceDef(
-    resource: state.posts,
-    initialData: Post.mocks(),
-    onLoadMore: () => cubit.loadMore(),
-    itemBuilder: (context, index, post) => PostTile(post),
   ),
+)
+```
+
+#### Approach 2: Selective Rebuilds (Preferred for high performance)
+Wrap `MultiResourceBuilder` in a static `Builder`, omit the `resource` parameter, and use `selectorBuilder`.
+
+**Why use this?** This is preferred for massive screens where widgets are independent and rendering performance is critical. Only the specific resource that changed will rebuild its sliver. The tradeoff is that you **lose global state aggregation** (no full-page error/empty states), but each sliver perfectly handles its own local loading/error states.
+
+```dart
+Builder(
+  builder: (context) {
+    final cubit = context.read<PostCubit>();
+    return MultiResourceBuilder<Failure>(
+      globalError: Failure('Something went wrong'),
+      onRefresh: () => cubit.refreshAll(),
+      standards: [
+        ResourceDef(
+          // resource: is omitted! Relies purely on selectorBuilder
+          selectorBuilder: (childBuilder) => BlocSelector<PostCubit, PostState, Resource<User, Failure>>(
+            selector: (state) => state.profile,
+            builder: childBuilder,
+          ),
+          initialData: User.mock(),
+          builder: (context, user) => ProfileSliver(user),
+        ),
+      ],
+      paginated: PaginatedResourceDef(
+        // resource: is omitted! Relies purely on selectorBuilder
+        selectorBuilder: (childBuilder) => BlocSelector<PostCubit, PostState, Resource<PaginatedPosts, Failure>>(
+          selector: (state) => state.posts,
+          builder: childBuilder,
+        ),
+        initialData: Post.mocks(),
+        onLoadMore: () => cubit.loadMore(),
+        itemBuilder: (context, index, post) => PostTile(post),
+      ),
+    );
+  }
 )
 ```
 

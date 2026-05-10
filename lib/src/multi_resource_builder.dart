@@ -71,7 +71,9 @@ abstract class _MultiResourceBase<E> extends StatelessWidget {
     // 3. Success State (Slivers) or separate loading as skeleton if loading flag is true
     Widget result = CustomScrollView(slivers: slivers);
 
-    if (onRefresh != null && aggregateResources.any((r) => r.data != null)) {
+    if (onRefresh != null &&
+        (aggregateResources.isEmpty ||
+            aggregateResources.any((r) => r.data != null))) {
       result = RefreshIndicator(onRefresh: onRefresh!, child: result);
     }
 
@@ -85,8 +87,8 @@ abstract class _MultiResourceBase<E> extends StatelessWidget {
 /// A configuration defining how a standard [Resource] should be rendered
 /// within a [MultiResourceBuilder].
 class ResourceDef<T, E> {
-  /// The resource state to render.
-  final Resource<T, E> resource;
+  /// The resource state to render. Optional if [selectorBuilder] is provided.
+  final Resource<T, E>? resource;
 
   /// The builder called when the resource is loaded successfully.
   final Widget Function(BuildContext context, T data) builder;
@@ -106,28 +108,75 @@ class ResourceDef<T, E> {
   /// Optional callback for a retry action.
   final VoidCallback? onRetry;
 
+  /// Optional selector builder that wraps this resource's sliver in a
+  /// state-management selector widget (e.g., `BlocSelector`, Provider's
+  /// `Selector`, etc.).
+  ///
+  /// When provided, the [Resource] is supplied by the selector instead of
+  /// directly from [resource]. This ensures only this specific resource's
+  /// widget rebuilds when its state changes — siblings remain untouched.
+  ///
+  /// If you omit [resource] entirely, this resource will not be included in
+  /// the [MultiResourceBuilder]'s global error/empty aggregate checks.
+  ///
+  /// ```dart
+  /// ResourceDef<User, String>(
+  ///   selectorBuilder: (childBuilder) =>
+  ///     BlocSelector<PostCubit, PostState, Resource<User, String>>(
+  ///       selector: (state) => state.userResource,
+  ///       builder: (context, resource) => childBuilder(context, resource),
+  ///     ),
+  ///   builder: (context, user) => SliverToBoxAdapter(
+  ///     child: ProfileHeader(user: user),
+  ///   ),
+  /// )
+  /// ```
+  final Widget Function(
+    Widget Function(BuildContext context, Resource<T, E> resource) childBuilder,
+  )?
+  selectorBuilder;
+
   ResourceDef({
-    required this.resource,
+    this.resource,
     required this.builder,
     this.initialData,
     this.loading,
     this.error,
     this.empty,
     this.onRetry,
-  });
+    this.selectorBuilder,
+  }) : assert(
+         resource != null || selectorBuilder != null,
+         'Must provide either resource or selectorBuilder',
+       );
+
+  /// Builds the [ResourceBuilder] sliver for the given [resource].
+  Widget _buildSliver(Resource<T, E> resource, bool useSkeleton) =>
+      ResourceBuilder<T, E>(
+        resource: resource,
+        builder: builder,
+        initialData: initialData,
+        useSliver: true,
+        useSkeleton: useSkeleton,
+        loading: loading,
+        error: error,
+        empty: empty,
+        onRetry: onRetry,
+      );
 
   /// Converts this definition into a sliver widget.
-  Widget toSliver([bool useSkeleton = true]) => ResourceBuilder<T, E>(
-    resource: resource,
-    builder: builder,
-    initialData: initialData,
-    useSliver: true,
-    useSkeleton: useSkeleton,
-    loading: loading,
-    error: error,
-    empty: empty,
-    onRetry: onRetry,
-  );
+  ///
+  /// If [selectorBuilder] is provided, the sliver is wrapped in the user's
+  /// state-management selector — only this resource rebuilds when it changes.
+  /// Otherwise, the sliver is built directly from [resource].
+  Widget toSliver([bool useSkeleton = true]) {
+    if (selectorBuilder != null) {
+      return selectorBuilder!(
+        (context, resource) => _buildSliver(resource, useSkeleton),
+      );
+    }
+    return _buildSliver(resource!, useSkeleton);
+  }
 }
 
 /// A configuration defining how a paginated [Resource] should be rendered
@@ -135,8 +184,8 @@ class ResourceDef<T, E> {
 ///
 /// This is used for lists of data that implement [PaginatedData].
 class PaginatedResourceDef<T, P extends PaginatedData<T>, E> {
-  /// The paginated resource state to render.
-  final Resource<P, E> resource;
+  /// The paginated resource state to render. Optional if [selectorBuilder] is provided.
+  final Resource<P, E>? resource;
 
   /// The builder called for each item in the paginated list.
   final Widget Function(BuildContext context, int index, T item)? itemBuilder;
@@ -171,8 +220,23 @@ class PaginatedResourceDef<T, P extends PaginatedData<T>, E> {
   /// The spacing between items in the list.
   final double spacing;
 
+  /// Optional selector builder that wraps this resource's sliver in a
+  /// state-management selector widget (e.g., `BlocSelector`, Provider's
+  /// `Selector`, etc.).
+  ///
+  /// When provided, the [Resource] is supplied by the selector instead of
+  /// directly from [resource]. This ensures only this specific resource's
+  /// widget rebuilds when its state changes — siblings remain untouched.
+  ///
+  /// If you omit [resource] entirely, this resource will not be included in
+  /// the [MultiResourceBuilder]'s global error/empty aggregate checks.
+  final Widget Function(
+    Widget Function(BuildContext context, Resource<P, E> resource) childBuilder,
+  )?
+  selectorBuilder;
+
   PaginatedResourceDef({
-    required this.resource,
+    this.resource,
     this.itemBuilder,
     this.customBuilder,
     this.initialData,
@@ -184,10 +248,14 @@ class PaginatedResourceDef<T, P extends PaginatedData<T>, E> {
     this.empty,
     this.onRetry,
     this.spacing = 10,
-  });
+    this.selectorBuilder,
+  }) : assert(
+         resource != null || selectorBuilder != null,
+         'Must provide either resource or selectorBuilder',
+       );
 
-  /// Converts this definition into a sliver widget.
-  Widget toSliver([bool useSkeleton = true]) =>
+  /// Builds the [PaginatedResourceBuilder] sliver for the given [resource].
+  Widget _buildSliver(Resource<P, E> resource, bool useSkeleton) =>
       PaginatedResourceBuilder<T, P, E>(
         resource: resource,
         itemBuilder: itemBuilder,
@@ -204,6 +272,20 @@ class PaginatedResourceDef<T, P extends PaginatedData<T>, E> {
         onRetry: onRetry,
         spacing: spacing,
       );
+
+  /// Converts this definition into a sliver widget.
+  ///
+  /// If [selectorBuilder] is provided, the sliver is wrapped in the user's
+  /// state-management selector — only this resource rebuilds when it changes.
+  /// Otherwise, the sliver is built directly from [resource].
+  Widget toSliver([bool useSkeleton = true]) {
+    if (selectorBuilder != null) {
+      return selectorBuilder!(
+        (context, resource) => _buildSliver(resource, useSkeleton),
+      );
+    }
+    return _buildSliver(resource!, useSkeleton);
+  }
 }
 
 /// A powerful builder widget that coordinates multiple [Resource] states into a
@@ -213,6 +295,10 @@ class PaginatedResourceDef<T, P extends PaginatedData<T>, E> {
 /// states of all provided resources to determine whether to show a global
 /// full-page error, a global empty state, or allow the individual resources
 /// to render their success/skeleton states.
+///
+/// For selective rebuilds, provide a [ResourceDef.selectorBuilder] on each
+/// resource to wrap it in your state management's selector (e.g., `BlocSelector`,
+/// Provider's `Selector`). Only the resource that changed will rebuild.
 ///
 /// All children are rendered as slivers within a single [CustomScrollView].
 class MultiResourceBuilder<E> extends _MultiResourceBase<E> {
@@ -239,8 +325,10 @@ class MultiResourceBuilder<E> extends _MultiResourceBase<E> {
     this.useSkeleton = true,
   }) : super(
          aggregateResources: [
-           ...standards.map((s) => s.resource),
-           if (paginated != null) paginated.resource,
+           ...standards
+               .where((s) => s.resource != null)
+               .map((s) => s.resource!),
+           if (paginated?.resource != null) paginated!.resource!,
          ],
        );
 

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.6]
+
+### Added
+- **Agnostic Selective Rebuilds**: Introduced the `selectorBuilder` parameter in `ResourceDef` and `PaginatedResourceDef`. Wrap individual slivers in any native state management selector (like `BlocSelector`) to prevent unnecessary full-screen rebuilds.
+- **Flexible Global Aggregation**: The `resource` parameter is now optional. Developers can rely solely on `selectorBuilder` to build high-performance independent sections, bypassing global state aggregation entirely when desired.
+
 ## [0.0.5]
 
 ### Added

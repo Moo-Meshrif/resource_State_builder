@@ -124,7 +124,6 @@ class PaginatedResourceBuilder<T, P extends PaginatedData<T>, E>
     }
   }
 
-
   ScrollPhysics? get _scrollPhysics {
     if (physics != null) return physics;
     if (onRefresh != null) return const AlwaysScrollableScrollPhysics();

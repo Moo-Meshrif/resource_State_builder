@@ -38,7 +38,7 @@ extension ResourcePaginatedX<T, E> on Resource<PaginatedData<T>, E> {
     if (currentData == null) {
       final newData = rebuild(newPage.items, newPage);
       if (mapStatus != null) return mapStatus(newData);
-      return self.copyWith(data: newData);
+      return Resource<P, E>.loaded(newData);
     }
 
     final merged = [...currentData.items, ...newPage.items];
@@ -79,8 +79,9 @@ extension ResourcePaginatedX<T, E> on Resource<PaginatedData<T>, E> {
     final currentData = self.data;
     if (currentData == null) return self;
 
-    final updated =
-        currentData.items.map((e) => test(e) ? update(e) : e).toList();
+    final updated = currentData.items
+        .map((e) => test(e) ? update(e) : e)
+        .toList();
     final newData = rebuild(updated, currentData);
     if (mapStatus != null) return mapStatus(newData);
     return self.copyWith(data: newData);

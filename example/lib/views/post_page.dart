@@ -20,45 +20,46 @@ class PostPage extends StatelessWidget {
             surfaceTintColor: Colors.transparent,
             title: const Text('Resource State Example'),
           ),
-          body: BlocBuilder<PostCubit, PostState>(
-            builder: (context, state) {
+          body: Builder(
+            builder: (context) {
               final cubit = context.read<PostCubit>();
-              return Column(
-                children: [
-                  Expanded(
-                    child: MultiResourceBuilder<String>(
-                      globalError: 'Failed to load page content',
-                      onRefresh: () => cubit.refreshAll(),
-                      onRetry: () => cubit.refreshAll(true),
-                      standards: [
-                        ResourceDef<User, String>(
-                          resource: state.userResource,
-                          initialData: User.mock,
-                          builder: (context, user) => SliverToBoxAdapter(
-                            child: ProfileHeader(
-                              user: user,
-                            ),
-                          ),
-                        ),
-                      ],
-                      paginated:
-                          PaginatedResourceDef<Post, PostsResponse, String>(
-                        resource: state.postResource,
-                        onLoadMore: () => cubit.loadMore(),
-                        onRetry: () => cubit.refreshPosts(true),
-                        itemBuilder: (context, index, post) => PostWidget(
-                          post: post,
-                          onDelete: () => cubit.deletePost(post.id),
-                          onMarkRead: () => cubit.markPostRead(post.id),
-                        ),
-                        skeletonBuilder: (items) => PostsResponse(
-                          posts: items,
-                        ),
-                        initialData: Post.mock,
+              return MultiResourceBuilder<String>(
+                globalError: 'Failed to load page content',
+                onRefresh: () => cubit.refreshAll(),
+                onRetry: () => cubit.refreshAll(true),
+                standards: [
+                  ResourceDef<User, String>(
+                    selectorBuilder: (childBuilder) => BlocSelector<PostCubit,
+                        PostState, Resource<User, String>>(
+                      selector: (s) => s.userResource,
+                      builder: childBuilder,
+                    ),
+                    initialData: User.mock,
+                    builder: (context, user) => SliverToBoxAdapter(
+                      child: ProfileHeader(
+                        user: user,
                       ),
                     ),
                   ),
                 ],
+                paginated: PaginatedResourceDef<Post, PostsResponse, String>(
+                  selectorBuilder: (childBuilder) => BlocSelector<PostCubit,
+                      PostState, Resource<PostsResponse, String>>(
+                    selector: (s) => s.postResource,
+                    builder: childBuilder,
+                  ),
+                  onLoadMore: () => cubit.loadMore(),
+                  onRetry: () => cubit.refreshPosts(true),
+                  itemBuilder: (context, index, post) => PostWidget(
+                    post: post,
+                    onDelete: () => cubit.deletePost(post.id),
+                    onMarkRead: () => cubit.markPostRead(post.id),
+                  ),
+                  skeletonBuilder: (items) => PostsResponse(
+                    posts: items,
+                  ),
+                  initialData: Post.mock,
+                ),
               );
             },
           ),
